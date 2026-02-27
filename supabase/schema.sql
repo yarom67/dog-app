@@ -126,6 +126,24 @@ create table if not exists therapy_sessions (
 -- Run in Supabase > Storage > Create bucket:
 -- Name: dog-images, Public: true
 
+-- ── STORAGE RLS POLICIES ──────────────────────
+-- Allow anyone (anon) to upload and read dog images
+-- (personal app, no auth required)
+create policy "Allow public uploads to dog-images"
+  on storage.objects for insert
+  to anon, authenticated
+  with check (bucket_id = 'dog-images');
+
+create policy "Allow public reads from dog-images"
+  on storage.objects for select
+  to anon, authenticated
+  using (bucket_id = 'dog-images');
+
+create policy "Allow public deletes from dog-images"
+  on storage.objects for delete
+  to anon, authenticated
+  using (bucket_id = 'dog-images');
+
 -- ── INDEXES ───────────────────────────────────
 create index if not exists idx_medications_dog on medications(dog_id);
 create index if not exists idx_medication_logs_dog on medication_logs(dog_id);
