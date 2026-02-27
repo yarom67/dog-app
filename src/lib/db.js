@@ -92,11 +92,31 @@ export async function deleteDog(id) {
   return true
 }
 
+function compressImage(file, maxPx = 800, quality = 0.8) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+      if (width > maxPx || height > maxPx) {
+        if (width > height) { height = Math.round(height * maxPx / width); width = maxPx }
+        else { width = Math.round(width * maxPx / height); height = maxPx }
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width; canvas.height = height
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+      canvas.toBlob(resolve, 'image/jpeg', quality)
+    }
+    img.src = url
+  })
+}
+
 export async function uploadDogImage(file) {
+  const compressed = await compressImage(file)
   if (isConfigured()) {
-    const ext = file.name.split('.').pop()
-    const path = `dogs/${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from('dog-images').upload(path, file)
+    const path = `dogs/${Date.now()}.jpg`
+    const { error } = await supabase.storage.from('dog-images').upload(path, compressed)
     if (error) throw error
     const { data } = supabase.storage.from('dog-images').getPublicUrl(path)
     return data.publicUrl
@@ -105,7 +125,7 @@ export async function uploadDogImage(file) {
   return new Promise((resolve) => {
     const reader = new FileReader()
     reader.onload = (e) => resolve(e.target.result)
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(compressed)
   })
 }
 
