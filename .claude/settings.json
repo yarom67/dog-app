@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"/Users/yaromganor/Desktop/Claude Code/Dog App/dog-app\" && npm run lint --silent 2>&1 | head -20"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$CLAUDE_TOOL_INPUT\" | grep -q '\\.env\"' && echo 'Blocked: .env contains live Supabase credentials — edit it manually' && exit 1 || exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}
