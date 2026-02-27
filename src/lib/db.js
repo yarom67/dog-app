@@ -60,13 +60,15 @@ export async function getDog(id) {
 
 export async function saveDog(dog) {
   if (isConfigured()) {
-    if (dog.id) {
-      const { id, created_at, ...updates } = dog
+    // Postgres rejects empty strings for date columns — convert to null
+    const payload = { ...dog, date_of_birth: dog.date_of_birth || null }
+    if (payload.id) {
+      const { id, created_at, ...updates } = payload
       const { data, error } = await supabase.from('dogs').update(updates).eq('id', id).select().single()
       if (error) throw error
       return data
     } else {
-      const { data, error } = await supabase.from('dogs').insert(dog).select().single()
+      const { data, error } = await supabase.from('dogs').insert(payload).select().single()
       if (error) throw error
       return data
     }
@@ -93,9 +95,10 @@ export async function deleteDog(id) {
 }
 
 function compressImage(file, maxPx = 800, quality = 0.8) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image()
     const url = URL.createObjectURL(file)
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image')) }
     img.onload = () => {
       URL.revokeObjectURL(url)
       let { width, height } = img
@@ -106,7 +109,10 @@ function compressImage(file, maxPx = 800, quality = 0.8) {
       const canvas = document.createElement('canvas')
       canvas.width = width; canvas.height = height
       canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-      canvas.toBlob(resolve, 'image/jpeg', quality)
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('Failed to compress image'))
+        resolve(blob)
+      }, 'image/jpeg', quality)
     }
     img.src = url
   })
@@ -116,14 +122,14 @@ export async function uploadDogImage(file) {
   const compressed = await compressImage(file)
   if (isConfigured()) {
     const path = `dogs/${Date.now()}.jpg`
-    const { error } = await supabase.storage.from('dog-images').upload(path, compressed)
-    if (!error) {
-      const { data } = supabase.storage.from('dog-images').getPublicUrl(path)
-      return data.publicUrl
-    }
-    // Storage not accessible (e.g. RLS policies not configured) — fall through to base64
+    const { error } = await supabase.storage.from('dog-images').upload(path, compressed, {
+      contentType: 'image/jpeg',
+    })
+    if (error) throw error
+    const { data } = supabase.storage.from('dog-images').getPublicUrl(path)
+    return data.publicUrl
   }
-  // Fallback: base64 stored directly in avatar_url
+  // Offline fallback: base64 stored directly in avatar_url
   return new Promise((resolve) => {
     const reader = new FileReader()
     reader.onload = (e) => resolve(e.target.result)
