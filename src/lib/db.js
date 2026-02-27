@@ -117,11 +117,13 @@ export async function uploadDogImage(file) {
   if (isConfigured()) {
     const path = `dogs/${Date.now()}.jpg`
     const { error } = await supabase.storage.from('dog-images').upload(path, compressed)
-    if (error) throw error
-    const { data } = supabase.storage.from('dog-images').getPublicUrl(path)
-    return data.publicUrl
+    if (!error) {
+      const { data } = supabase.storage.from('dog-images').getPublicUrl(path)
+      return data.publicUrl
+    }
+    // Storage not accessible (e.g. RLS policies not configured) — fall through to base64
   }
-  // Fallback: base64
+  // Fallback: base64 stored directly in avatar_url
   return new Promise((resolve) => {
     const reader = new FileReader()
     reader.onload = (e) => resolve(e.target.result)
